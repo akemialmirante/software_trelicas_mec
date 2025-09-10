@@ -1,0 +1,461 @@
+import streamlit as st
+
+html_code = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Editor de Treliças</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 12px;
+      background: #f2f4f7;
+      color: #111;
+    }
+    #toolbar {
+      margin-bottom: 8px;
+    }
+    button, select {
+      margin-right: 6px;
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+    #canvasWrap {
+      border: 1px solid #bbb;
+      display: inline-block;
+      background: white;
+    }
+    canvas { display: block; }
+    #info {
+      display: inline-block;
+      vertical-align: top;
+      margin-left: 12px;
+      width: 340px;
+    }
+    textarea { width: 100%; height: 220px; margin-top: 6px; font-family: monospace; }
+    .small { font-size: 13px; color: #444; }
+    .log { height: 120px; overflow-y: auto; background: #fff; border: 1px solid #ddd; padding: 6px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h2>Editor de Treliças</h2>
+  <div id="toolbar">
+    <label>Modo:</label>
+    <select id="mode">
+      <option value="add">Adicionar Nó</option>
+      <option value="connect">Conectar Nós (duplo clique em dois nós)</option>
+      <option value="erase">Apagar Nó / Barra</option>
+    </select>
+    <button id="exportBtn">Exportar .txt</button>
+    <button id="clearBtn">Limpar</button>
+    <button id="undoBtn">Desfazer</button>
+    <span class="small">(snap: 1 unidade = 1 grid)</span>
+  </div>
+
+  <div>
+    <div id="canvasWrap">
+      <canvas id="gridCanvas" width="720" height="480" style="width:720px;height:480px;"></canvas>
+    </div>
+    <div id="info">
+      <div><strong>Instruções</strong></div>
+      <div class="small">
+        - Clique para adicionar nós (snap ao grid).<br>
+        - No modo <em>Conectar</em>, clique em dois nós existentes para criar uma barra.<br>
+        - No modo <em>Apagar</em>, clique em nó ou barra para remover.<br>
+        - Use <em>Exportar .txt</em> para gerar o arquivo de entrada para seu programa.
+      </div>
+
+      <h4>Nós</h4>
+      <div id="nodesList" class="small"></div>
+
+      <h4>Barras</h4>
+      <div id="barsList" class="small"></div>
+
+      <h4>Log</h4>
+      <div class="log" id="log"></div>
+
+      <h4>Conteúdo do .txt</h4>
+      <textarea id="txtOut" readonly></textarea>
+    </div>
+  </div>
+
+<script>
+  // ===== Config =====
+  const canvas = document.getElementById('gridCanvas');
+  const ctx = canvas.getContext('2d');
+  const spacing = 24; // pixels per grid unit (visual). Ajuste se quiser.
+  const radius = 7; // selection radius in pixels
+  const modeSelect = document.getElementById('mode');
+  const exportBtn = document.getElementById('exportBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const nodesListDiv = document.getElementById('nodesList');
+  const barsListDiv = document.getElementById('barsList');
+  const logDiv = document.getElementById('log');
+  const txtOut = document.getElementById('txtOut');
+
+  // ===== DPI handling (fix canvas blur and coordinate mismatch) =====
+  function fixDPI() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // scale drawing operations to CSS pixels
+  }
+  fixDPI();
+  window.addEventListener('resize', () => { fixDPI(); redraw(); });
+
+  // ===== Data =====
+  let nodes = [];     // {id, name, gx, gy, xPx, yPx}
+  let bars = [];      // {id, n1, n2}
+  let selected = [];  // used in connect mode (hold node ids)
+  let history = [];   // simple undo stack
+
+  // ===== Utility =====
+  function makeName(index) {
+    // 1 -> A, 26 -> Z, 27 -> AA, etc.
+    let s = "";
+    while (index > 0) {
+      let rem = (index - 1) % 26;
+      s = String.fromCharCode(65 + rem) + s;
+      index = Math.floor((index - 1) / 26);
+    }
+    return s;
+  }
+
+  function log(msg) {
+    const p = document.createElement('div');
+    p.textContent = msg;
+    logDiv.appendChild(p);
+    logDiv.scrollTop = logDiv.scrollHeight;
+  }
+
+  function snapshot() {
+    history.push({ nodes: JSON.parse(JSON.stringify(nodes)), bars: JSON.parse(JSON.stringify(bars)) });
+    if (history.length > 50) history.shift();
+  }
+  function undo() {
+    if (history.length === 0) return;
+    const state = history.pop();
+    nodes = state.nodes;
+    bars = state.bars;
+    selected = [];
+    redraw();
+    refreshPanels();
+    log('Desfeito');
+  }
+
+  // ===== Drawing =====
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawGrid() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx.save();
+    ctx.lineWidth = 1;
+    // background
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(0,0,w,h);
+
+    // vertical/horizontal lines
+    ctx.strokeStyle = '#e0e0e0';
+    for (let x = 0; x <= w; x += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(w, y + 0.5);
+      ctx.stroke();
+    }
+
+    // darker axes lines at origin (0,0) = top-left by design (you can change to center)
+    ctx.strokeStyle = '#c0c0c0';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5); ctx.lineTo(w, 0.5); ctx.stroke(); // top axis
+    ctx.beginPath();
+    ctx.moveTo(0.5, 0); ctx.lineTo(0.5, h); ctx.stroke(); // left axis
+    ctx.restore();
+  }
+
+  function drawBars() {
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#2b7cff';
+    bars.forEach(b => {
+      const n1 = nodes.find(n => n.id === b.n1);
+      const n2 = nodes.find(n => n.id === b.n2);
+      if (!n1 || !n2) return;
+      ctx.beginPath();
+      ctx.moveTo(n1.xPx, n1.yPx);
+      ctx.lineTo(n2.xPx, n2.yPx);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawNodes() {
+    nodes.forEach(n => {
+      // fill
+      ctx.beginPath();
+      ctx.arc(n.xPx, n.yPx, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#e33';
+      ctx.fill();
+      // border
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // label
+      ctx.fillStyle = '#000';
+      ctx.font = '12px Arial';
+      ctx.fillText(n.name, n.xPx + 10, n.yPx - 8);
+    });
+    // draw selected highlight (if any)
+    selected.forEach(id => {
+      const nn = nodes.find(n => n.id === id);
+      if (!nn) return;
+      ctx.beginPath();
+      ctx.arc(nn.xPx, nn.yPx, radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = '#18a85b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+  }
+
+  function redraw() {
+    clearCanvas();
+    drawGrid();
+    drawBars();
+    drawNodes();
+  }
+
+  // ===== Hit detection =====
+  function findNodeAt(px, py) {
+    // px,py in CSS pixels (not scaled)
+    return nodes.find(n => Math.hypot(n.xPx - px, n.yPx - py) <= radius + 6);
+  }
+
+  function findBarAt(px, py) {
+    // check if click near any bar (distance to segment)
+    for (let b of bars) {
+      const a = nodes.find(n => n.id === b.n1);
+      const c = nodes.find(n => n.id === b.n2);
+      if (!a || !c) continue;
+      // distance from point to segment a-c
+      const dist = pointToSegmentDistance(px, py, a.xPx, a.yPx, c.xPx, c.yPx);
+      if (dist < 6) return b;
+    }
+    return null;
+  }
+  function pointToSegmentDistance(px,py,x1,y1,x2,y2){
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+
+    const dot = A * C + B * D;
+    const len_sq = C * C + D * D;
+    let param = -1;
+    if (len_sq !== 0) param = dot / len_sq;
+    let xx, yy;
+
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+    const dx = px - xx;
+    const dy = py - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // ===== Mouse handling =====
+  canvas.addEventListener('click', (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = ev.clientX - rect.left;
+    const py = ev.clientY - rect.top;
+    const mode = modeSelect.value;
+
+    // snap to grid (CSS pixels)
+    const snappedX = Math.round(px / spacing) * spacing;
+    const snappedY = Math.round(py / spacing) * spacing;
+
+    if (mode === 'add') {
+      // avoid duplicate node at same grid snap
+      const exists = nodes.some(n => n.xPx === snappedX && n.yPx === snappedY);
+      if (exists) {
+        log('Já existe nó nesse ponto.');
+        return;
+      }
+      snapshot();
+      const id = nodes.length + 1;
+      const name = makeName(id);
+      nodes.push({ id: id, name: name, gx: snappedX / spacing, gy: snappedY / spacing, xPx: snappedX, yPx: snappedY });
+      log(`Nó ${name} adicionado (${(snappedX/spacing).toFixed(2)}, ${(snappedY/spacing).toFixed(2)})`);
+      redraw();
+      refreshPanels();
+      return;
+    }
+
+    if (mode === 'connect') {
+      // if clicked on a node -> push selection
+      const node = findNodeAt(px, py);
+      if (!node) {
+        log('Clique em um nó para selecionar (modo Conectar).');
+        return;
+      }
+      selected.push(node.id);
+      if (selected.length === 2) {
+        const [aId, bId] = selected;
+        if (aId === bId) {
+          log('Não é possível conectar nó consigo mesmo.');
+          selected = [];
+          redraw();
+          return;
+        }
+        // check duplicate
+        const already = bars.some(b => (b.n1 === aId && b.n2 === bId) || (b.n1 === bId && b.n2 === aId));
+        if (!already) {
+          snapshot();
+          const newId = bars.length + 1;
+          bars.push({ id: newId, n1: aId, n2: bId });
+          log(`Barra criada entre ${makeName(aId)} e ${makeName(bId)}.`);
+        } else {
+          log('Barra já existe.');
+        }
+        selected = [];
+        redraw();
+        refreshPanels();
+      } else {
+        redraw();
+        refreshPanels();
+        log(`Nó ${node.name} selecionado (aguardando segundo nó).`);
+      }
+      return;
+    }
+
+    if (mode === 'erase') {
+      // If click near a bar -> remove it
+      const b = findBarAt(px, py);
+      if (b) {
+        snapshot();
+        bars = bars.filter(bb => bb.id !== b.id);
+        log(`Barra ${b.id} removida.`);
+        redraw();
+        refreshPanels();
+        return;
+      }
+      const n = findNodeAt(px, py);
+      if (n) {
+        snapshot();
+        // remove bars that reference this node
+        bars = bars.filter(bb => bb.n1 !== n.id && bb.n2 !== n.id);
+        // remove node and reassign ids & names to keep sequence
+        nodes = nodes.filter(nn => nn.id !== n.id);
+        // reindex nodes
+        nodes.forEach((nn, idx) => {
+          nn.id = idx + 1;
+          nn.name = makeName(idx + 1);
+        });
+        // reindex bars ids
+        bars.forEach((bb, idx) => bb.id = idx + 1);
+        log(`Nó ${n.name} removido.`);
+        redraw();
+        refreshPanels();
+        return;
+      }
+      log('Nada para apagar nesse ponto.');
+    }
+  });
+
+  // ===== Panels =====
+  function refreshPanels() {
+    nodesListDiv.innerHTML = nodes.map(n => `${n.name} (gx=${n.gx.toFixed(2)}, gy=${n.gy.toFixed(2)})`).join('<br>') || '(nenhum)';
+    barsListDiv.innerHTML = bars.map(b => `${b.id}: ${makeName(b.n1)} - ${makeName(b.n2)}`).join('<br>') || '(nenhum)';
+    // update txt preview
+    txtOut.value = buildTxtString();
+  }
+
+  // ===== Export TXT (formato pedido) =====
+  function buildTxtString() {
+    const n = nodes.length;
+    const m = bars.length;
+    let lines = [];
+    lines.push(`${n}; ${m}`);
+    // nodes: Name; x; y (use gx,gy as meters)
+    nodes.forEach(nd => {
+      lines.push(`${nd.name}; ${nd.gx.toFixed(2)}; ${nd.gy.toFixed(2)}`);
+    });
+    // adjacency matrix n x n
+    // create zero matrix
+    const mat = Array.from({length:n}, () => Array(n).fill(0));
+    bars.forEach(b => {
+      const i = b.n1 - 1;
+      const j = b.n2 - 1;
+      if (i >= 0 && j >= 0 && i < n && j < n) {
+        mat[i][j] = 1;
+        mat[j][i] = 1;
+      }
+    });
+    mat.forEach(row => lines.push(row.join('; ')));
+    // forces (all zeros for now)
+    for (let i = 0; i < n; i++) lines.push('0.0; 0.0');
+    // supports default 'N' (livre)
+    for (let i = 0; i < n; i++) lines.push('N');
+    return lines.join('\\n');
+  }
+
+  function exportTXT() {
+    const content = buildTxtString();
+    // Download as file
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'trelica.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    log('Arquivo trelica.txt gerado (download).');
+    txtOut.value = content; // also show in textarea
+  }
+
+  // ===== Buttons =====
+  exportBtn.addEventListener('click', () => exportTXT());
+  clearBtn.addEventListener('click', () => {
+    snapshot();
+    nodes = [];
+    bars = [];
+    selected = [];
+    redraw();
+    refreshPanels();
+    log('Canvas limpo.');
+  });
+  undoBtn.addEventListener('click', () => undo());
+
+  // ===== Init =====
+  redraw();
+  refreshPanels();
+  log('Editor pronto. Salve o arquivo .html e abra no navegador. Se não funcionar, abra o console (F12) e me diga o erro.');
+
+  // expose for debugging
+  window.__editor = { nodes, bars, redraw, exportTXT, buildTxtString };
+</script>
+</body>
+</html>
+
+"""
+
+st.components.v1.html(html_code, height=500)
