@@ -1,0 +1,21 @@
+Relatório 
+
+Disciplina: Mecânica para Engenharia da Computação, Prof. Hugo Leonardo
+Grupo: Akemi Almirante, Carlos Andrei, Luan Motta, Lucas Rabelo, Maria Vitória
+
+O projeto em questão foi a formulação de um software que calculasse as resultantes de compressão e tração em treliças 2D quaisquer, em que a
+partir de parâmetros de quantidade de nós, elementos, forças de carregamento, pontos de apoio, seja possivel calcular essas forças em cada elemento.
+
+Nesse projeto, foi utilizada a lingaugem de programação Python, a biblioteca AnaStruct para calcular com precisão e a geração de imagens das treliças e
+a biblioteca web Streamlit, que permitiu a visualização mais agradável e interativa do sistema.
+
+Para rodar esse código na sua máquina, primeiramente é necessário instalar as bibliotecas com esse comando:
+
+        pip install anastruct[plot], streamlit, streamlit-drawable-canvas
+
+Para compilar e visualizar via Streamlit, é necessário:
+
+        streamlit run -caminho do arquivo até web.py-
+
+
+Aqui estão os resultados da sua simulação 

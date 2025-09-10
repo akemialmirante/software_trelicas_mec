@@ -1,8 +1,7 @@
 from mec import processar_trelica
-from quadro import quadro_interativo
+from quadro import *
 
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
 
 import os as os
 
@@ -10,6 +9,13 @@ if 'current_page' not in st.session_state:
     st.session_state.current_page = 'main'
     st.rerun()
 
+def pegar_detalhes(ss):
+    
+    resultados = []
+    for i in range(len(canvas_to_file_format.no)):
+        resultados.append(ss.get_element_results(i))
+        
+        
 def mostrar_graficos(ss):
             
     if(uploaded_files):
@@ -25,14 +31,15 @@ def mostrar_graficos(ss):
         with col2:
             st.subheader("Forças de Reação")
             fig_reaction = ss.show_reaction_force(show=False)
-            st.pyplot(fig_reaction) 
+            st.pyplot(fig_reaction)
+            
             
         with col3:
             st.subheader("Forças Axiais")
             fig_axial = ss.show_axial_force(show=False)
             st.pyplot(fig_axial)
 
-
+    
 if st.session_state.current_page == 'main':
     
     # visuais primários do streamlit
@@ -70,10 +77,47 @@ if st.session_state.current_page == 'main':
             
             proc_trel = processar_trelica(temp_path)
             if proc_trel:
-                mostrar_graficos(proc_trel)
-                
+                st.session_state.processed_truss = proc_trel
+                st.session_state.selected_file = arquivo_selecionado
             os.remove(temp_path)
+
+
+            if 'processed_truss' in st.session_state and st.session_state.processed_truss:
+                mostrar_graficos(st.session_state.processed_truss)
+                
+            if st.button("Gerar relatório"):
+                st.session_state.current_page = "relatorio"
+                st.rerun()
+                        
+                        
+if st.session_state.current_page == "relatorio":
+    with st.spinner("Processando..."):
+                        
+        import datetime
+        hour = datetime.datetime.now().hour
+                        
+        os.makedirs(f"relatorios{hour}", exist_ok=True)
+                            
+        relatorio = f"relatorio.txt"
+        with open("relatorio.txt", "w") as f:
+            st.write("gozei")
+                                
+            f.write(f"{len(canvas_to_file_format.no)}")
+            f.write(f"{pegar_detalhes(proc_trel)}")
+                                
+            f_struct = st.session_state.processed_truss.show_structure(show=False)
+            f_struct.savefig(f"relatorios{hour}/estrutura.png", dpi=300, bbox_inches='tight')
+            f_react = proc_trel.show_reaction_force(show=False)
+            f_react.savefig(f"relatorios{hour}/f_reacao.png", dpi=300, bbox_inches='tight')
+            f_ax = proc_trel.show_axial_force(show=False)
+            f_react.savefig(f"relatorios{hour}/f_axiais.png", dpi=300, bbox_inches='tight')
+                
+            f.write(f"{pegar_detalhes(st.session_state.processed_truss)}")
             
+    os.rename("relatorio.txt", "relatorio_{hour}.txt")
+    st.session_state.current_page = "main"
+    
+    
 if st.session_state.current_page == "tracker":
 
     if st.button("← Voltar para Seleção"):
@@ -81,3 +125,5 @@ if st.session_state.current_page == "tracker":
         st.rerun()
     
     quadro_interativo()
+    
+    
