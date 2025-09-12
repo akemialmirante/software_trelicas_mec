@@ -3,6 +3,12 @@ from streamlit_drawable_canvas import st_canvas
 import numpy as np
 import tempfile
 import os
+import importlib
+
+web = importlib.import_module("web")
+mostrar_graficos = web.mostrar_graficos
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from mec import processar_trelica
 
@@ -29,14 +35,29 @@ def extrair_quadro(canvas_result):
                 "radius": obj["radius"]
             })
             
-        elif obj["type"] == "line":  # conexoes = linhas entre nós
+        elif obj["type"] == "line":\
+            
+            x1_abs = obj["left"] + obj["x1"]
+            y1_abs = obj["top"] + obj["y1"]
+            x2_abs = obj["left"] + obj["x2"]
+            y2_abs = obj["top"] + obj["y2"]
+
+            conexoes.append({
+            "x1": x1_abs,
+            "y1": y1_abs,
+            "x2": x2_abs,
+            "y2": y2_abs
+            })
+            
+        """  elif obj["type"] == "line":  # conexoes = linhas entre nós
             
             conexoes.append({
                 "x1": obj["x1"],
                 "y1": obj["y1"], 
                 "x2": obj["x2"],
                 "y2": obj["y2"]
-            })
+            }) 
+        """
             
     return nos, conexoes, forcas, suportes
 
