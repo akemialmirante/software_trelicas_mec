@@ -7,8 +7,8 @@
     body {
       font-family: Arial, Helvetica, sans-serif;
       margin: 12px;
-      background: #f2f4f7;
-      color: #111;
+      background: #0d1116;
+      color: #dbdbdb;
     }
     #toolbar { margin-bottom: 8px; }
     button, select {
@@ -255,8 +255,8 @@
     if (node) {
       let vinc = prompt("Digite o vínculo (N, P, X, Y):", node.vinculo);
       if (["N","P","X","Y"].includes(vinc)) node.vinculo = vinc;
-      let px = parseFloat(prompt("Força Px:", node.forca.px));
-      let py = parseFloat(prompt("Força Py:", node.forca.py));
+      let px = parseFloat(prompt("Força Fx:", node.forca.px));
+      let py = parseFloat(prompt("Força Fy:", node.forca.py));
       node.forca = {px:isNaN(px)?0:px, py:isNaN(py)?0:py};
       redraw(); refreshPanels();
     }
@@ -271,7 +271,7 @@
   function buildTxtString() {
     const n=nodes.length, m=bars.length;
     let lines=[`${n}; ${m}`];
-    nodes.forEach(nd=>lines.push(`${nd.name}; ${nd.gx}; ${nd.gy}`));
+    nodes.forEach(nd=>lines.push(`${nd.name}; ${nd.gx}; ${-nd.gy}`));
     const mat=Array.from({length:n},()=>Array(n).fill(0));
     bars.forEach(b=>{mat[b.n1-1][b.n2-1]=1;mat[b.n2-1][b.n1-1]=1;});
     mat.forEach(r=>lines.push(r.join("; ")));

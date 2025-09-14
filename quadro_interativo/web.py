@@ -92,11 +92,11 @@ if st.session_state.current_page == 'main':
         key="op1"
     )
 
-    st.subheader("Opção 2: Clique abaixo para ter acesso aos inputs em gráfico interativo:")
-    if st.button("Comece a projetar!"):
-        st.session_state.current_page = "tracker"
+    # st.subheader("Opção 2: Clique abaixo para ter acesso aos inputs em gráfico interativo:")
+    # if st.button("Comece a projetar!"):
+    #     st.session_state.current_page = "tracker"
 
-    st.subheader("Opção 3: Quadro com graduação:")
+    st.subheader("Opção 2: Quadro com graduação:")
     if st.button("Clique aqui para desenhar!", key="desenhar"):
         st.session_state.current_page = "grid"
    
@@ -129,18 +129,18 @@ if st.session_state.current_page == 'main':
                 mostrar_graficos(st.session_state.processed_truss)
                 
                 
-if st.session_state.current_page == "tracker":
+# if st.session_state.current_page == "tracker":
 
-    if st.button("← Voltar para Seleção", key="voltar"):
-        st.session_state.current_page = 'main'
-        #st.rerun()
+#     if st.button("← Voltar para Seleção", key="voltar"):
+#         st.session_state.current_page = 'main'
+#         #st.rerun()
     
-    #temp = quadro_interativo()
-    #mostrar_graficos(temp)
+#     #temp = quadro_interativo()
+#     #mostrar_graficos(temp)
     
-    quadro_interativo()
-    if 'processed_truss' in st.session_state and st.session_state.processed_truss is not None:
-        mostrar_graficos(st.session_state.processed_truss)
+#     quadro_interativo()
+#     if 'processed_truss' in st.session_state and st.session_state.processed_truss is not None:
+#         mostrar_graficos(st.session_state.processed_truss)
 if st.session_state.current_page == "grid":
     
     if st.button("← Voltar para Seleção", key="voltar"):
