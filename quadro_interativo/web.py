@@ -3,6 +3,9 @@ from quadro import quadro_interativo
 
 import streamlit as st
 import os as os
+import pandas as pd
+
+EPSILON = 0.00001
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # se quiser rodar o quadro html em vez do quadro
 
@@ -32,6 +35,48 @@ def mostrar_graficos(ss):
             st.subheader("Forças Axiais")
             fig_axial = ss.show_axial_force(show=False)
             st.pyplot(fig_axial)
+
+        # ---- Tabelas ----
+        st.subheader("📊 Resultados Numéricos")
+
+        # Descobrir quantos nós e barras existem
+        num_nos = max(ss.node_map)
+        num_elementos = max(ss.element_map)
+
+        # Reações
+        reacoes = []
+        for node_id in range(1, num_nos + 1):
+            r = ss.get_node_results_system(node_id=node_id)
+            if(abs(r["Fx"]) < EPSILON):
+                r["Fx"] = 0
+            if(abs(r["Fy"]) < EPSILON):
+                r["Fy"] = 0
+            r["Fx"] = round(r["Fx"], 2) # Quem quiser fazer ficar em 2 algarismos significativos tá convidado
+            r["Fy"] = round(r["Fy"], 2)
+            reacoes.append({
+                "Nó": node_id,
+                "Rx": -r["Fx"], # ele acaba invertendo o sentido
+                "Ry": -r["Fy"],
+            })
+        df_reacoes = pd.DataFrame(reacoes)
+        st.write("**Reações de Apoio**")
+        st.dataframe(df_reacoes, use_container_width=True)
+
+        # Elementos
+
+        elementos = []
+        for element_id in range(1, num_elementos + 1):
+            e = ss.get_element_results(element_id=element_id)
+            axial = (e["Nmax"])
+            elementos.append({
+                "Elemento": element_id,
+                "Força axial": round(axial, 2),
+                "Tamanho da barra": round(e["length"], 2),
+                "Ângulo em relação ao eixo X": round(e["alpha"], 2)
+            })
+        df_elementos = pd.DataFrame(elementos)
+        st.write("**Elementos**")
+        st.dataframe(df_elementos, use_container_width=True)
 
     
 if st.session_state.current_page == 'main':

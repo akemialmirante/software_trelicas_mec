@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Editor de Treliças</title>
+  <style>
+    canvas {
+      border: 1px solid black;
+      background: #f8f8f8;
+    }
+  </style>
+</head>
+<body>
+  <h3>Editor de Treliças</h3>
+  <p>Clique no canvas para adicionar nós. Clique em dois nós para criar barras. Clique com o botão direito em um nó para definir vínculo e força.</p>
+  <canvas id="canvas" width="600" height="400"></canvas><br>
+  <button onclick="exportar()">Exportar .txt</button>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    let nos = [];   // [{id, x, y, vinculo, forca:{px,py}}]
+    let barras = []; // [[id1, id2]]
+    let selecao = [];
+
+    function desenhar() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // barras
+      ctx.strokeStyle = "black";
+      barras.forEach(([i, j]) => {
+        ctx.beginPath();
+        ctx.moveTo(nos[i].x, nos[i].y);
+        ctx.lineTo(nos[j].x, nos[j].y);
+        ctx.stroke();
+      });
+
+      // nós
+      nos.forEach(n => {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = "lightblue";
+        ctx.fill();
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        ctx.fillStyle = "black";
+        ctx.fillText(n.id, n.x + 10, n.y - 10);
+
+        if (n.forca.px !== 0 || n.forca.py !== 0) {
+          ctx.fillStyle = "red";
+          ctx.fillText(`F(${n.forca.px},${n.forca.py})`, n.x + 10, n.y + 10);
+        }
+        if (n.vinculo !== "N") {
+          ctx.fillStyle = "green";
+          ctx.fillText(n.vinculo, n.x - 20, n.y + 20);
+        }
+      });
+    }
+
+    function distancia(x1, y1, x2, y2) {
+      return Math.sqrt((x1 - x2)**2 + (y1 - y2)**2);
+    }
+
+    canvas.addEventListener("click", e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let selecionado = nos.findIndex(n => distancia(n.x, n.y, x, y) < 10);
+      if (selecionado >= 0) {
+        selecao.push(selecionado);
+        if (selecao.length === 2) {
+          barras.push([selecao[0], selecao[1]]);
+          selecao = [];
+        }
+      } else {
+        let id = String.fromCharCode(65 + nos.length); // A, B, C...
+        nos.push({ id, x, y, vinculo: "N", forca: { px: 0, py: 0 } });
+      }
+      desenhar();
+    });
+
+    canvas.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let idx = nos.findIndex(n => distancia(n.x, n.y, x, y) < 10);
+      if (idx >= 0) {
+        let vinculo = prompt("Digite o vínculo (N, P, X, Y):", nos[idx].vinculo);
+        if (["N", "P", "X", "Y"].includes(vinculo)) {
+          nos[idx].vinculo = vinculo;
+        }
+        let px = parseFloat(prompt("Força Px:", nos[idx].forca.px));
+        let py = parseFloat(prompt("Força Py:", nos[idx].forca.py));
+        nos[idx].forca = { px: isNaN(px) ? 0 : px, py: isNaN(py) ? 0 : py };
+      }
+      desenhar();
+    });
+
+    function exportar() {
+      let n = nos.length;
+      let m = barras.length;
+      let texto = `${n}; ${m}\n`;
+
+      // nós
+      nos.forEach(no => {
+        texto += `${no.id}; ${no.x.toFixed(2)}; ${no.y.toFixed(2)}\n`;
+      });
+
+      // matriz adjacência
+      for (let i = 0; i < n; i++) {
+        let linha = [];
+        for (let j = 0; j < n; j++) {
+          linha.push(barras.some(([a,b]) => (a===i && b===j) || (a===j && b===i)) ? 1 : 0);
+        }
+        texto += linha.join("; ") + "\n";
+      }
+
+      // forças
+      nos.forEach(no => {
+        texto += `${no.forca.px}; ${no.forca.py}\n`;
+      });
+
+      // vínculos
+      nos.forEach(no => {
+        texto += `${no.vinculo}\n`;
+      });
+
+      const blob = new Blob([texto], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "trelica.txt";
+      link.click();
+    }
+
+    desenhar();
+  </script>
+</body>
+</html>
