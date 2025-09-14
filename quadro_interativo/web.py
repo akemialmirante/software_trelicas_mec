@@ -1,28 +1,19 @@
 from mec import processar_trelica
-from quadro import *
-
+from quadro import quadro_interativo
 
 import streamlit as st
-
 import os as os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # se quiser rodar o quadro html em vez do quadro
 
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'main'
-    st.rerun()
+    #st.rerun()
 
-def pegar_detalhes(ss): # seria para o relatorio. 
-    
-    resultados = []
-    #for i in range(len(canvas_to_file_format.no)):
-        #resultados.append(ss.get_element_results(i))
-        
-        
 def mostrar_graficos(ss):
             
-    if(uploaded_files):
-        st.success(f"Treliça {arquivo_selecionado} processada com sucesso!")
+    #if(uploaded_files):
+        st.success(f"Treliça processada com sucesso!")
         
         col1, col2, col3 = st.columns(3)
                 
@@ -52,7 +43,8 @@ if st.session_state.current_page == 'main':
     uploaded_files = st.file_uploader(
         "Escolha arquivos de treliça (.txt)", 
         type=['txt'], 
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key="op1"
     )
 
     st.subheader("Opção 2: Clique abaixo para ter acesso aos inputs em gráfico interativo:")
@@ -91,45 +83,25 @@ if st.session_state.current_page == 'main':
             if 'processed_truss' in st.session_state and st.session_state.processed_truss:
                 mostrar_graficos(st.session_state.processed_truss)
                 
-            if st.button("Gerar relatório", key="gerar"):
-                st.session_state.current_page = "relatorio"
-                st.rerun()
-                        
-                        
-if st.session_state.current_page == "relatorio":
-    with st.spinner("Processando..."):
-                        
-        import datetime
-        hour = datetime.datetime.now().hour
-                        
-        os.makedirs(f"relatorios{hour}", exist_ok=True)
-                            
-        relatorio = f"relatorio.txt"
-        with open("relatorio.txt", "w") as f:
-                                
-            #f.write(f"{len(canvas_to_file_format.no)}")
-            f.write(f"{pegar_detalhes(proc_trel)}")
-                                
-            f_struct = st.session_state.processed_truss.show_structure(show=False)
-            f_struct.savefig(f"relatorios{hour}/estrutura.png", dpi=300, bbox_inches='tight')
-            f_react = proc_trel.show_reaction_force(show=False)
-            f_react.savefig(f"relatorios{hour}/f_reacao.png", dpi=300, bbox_inches='tight')
-            f_ax = proc_trel.show_axial_force(show=False)
-            f_react.savefig(f"relatorios{hour}/f_axiais.png", dpi=300, bbox_inches='tight')
                 
-            f.write(f"{pegar_detalhes(st.session_state.processed_truss)}")            
-    os.rename("relatorio.txt", "relatorio_{hour}.txt")
-    st.session_state.current_page = "main"
-    
 if st.session_state.current_page == "tracker":
 
     if st.button("← Voltar para Seleção", key="voltar"):
         st.session_state.current_page = 'main'
-        st.rerun()
+        #st.rerun()
+    
+    #temp = quadro_interativo()
+    #mostrar_graficos(temp)
     
     quadro_interativo()
-    
+    if 'processed_truss' in st.session_state and st.session_state.processed_truss is not None:
+        mostrar_graficos(st.session_state.processed_truss)
 if st.session_state.current_page == "grid":
+    
+    if st.button("← Voltar para Seleção", key="voltar"):
+        st.session_state.current_page = 'main'
+        #st.rerun()
+        
     with open(os.path.join(BASE_DIR, "teste_html.html"), "r", encoding="utf-8") as f:
        html_code = f.read()
       

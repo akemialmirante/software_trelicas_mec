@@ -29,34 +29,33 @@ def ler_arquivo(arquivo):
     return n, m, nos, coordenadas, matriz, forcas, vinculos
 
 
-
 # --- Função para processar o arquivo selecionado, usa LER_ARQUIVO() ---
 def processar_trelica(caminho_completo):
     
-    n, m, nos, coords, matriz, forcas, vinculos = ler_arquivo(caminho_completo)
+        n, m, nos, coords, matriz, forcas, vinculos = ler_arquivo(caminho_completo)
 
-    ss = SystemElements()
-    
-    # Elementos
-    for i in range(n):                          
-        for j in range(i + 1, n):
-            if matriz[i][j] == 1:
-                ss.add_truss_element(location=[coords[i], coords[j]])
-    
-    # Vínculos
-    for i, v in enumerate(vinculos):            
-        if v == "P":
-            ss.add_support_hinged(node_id=i + 1)
-        elif v == "X":
-            ss.add_support_roll(node_id=i + 1, direction=2)
-        elif v == "Y":
-            ss.add_support_roll(node_id=i + 1, direction=1)
-    
-    # Forças
-    for i, (Fx, Fy) in enumerate(forcas):       
-        if Fx != 0 or Fy != 0:
-            ss.point_load(node_id=i + 1, Fx=Fx, Fy=Fy)
-     
-    ss.solve()
-    
-    return ss
+        ss = SystemElements()
+        
+        # Elementos
+        for i in range(n):                          
+            for j in range(i + 1, n):
+                if matriz[i][j] == 1:
+                    ss.add_truss_element(location=[coords[i], coords[j]])
+        
+        # Vínculos
+        for i, v in enumerate(vinculos):            
+            if v == "P":
+                ss.add_support_hinged(node_id=i + 1)
+            elif v == "X":
+                ss.add_support_roll(node_id=i + 1, direction=2)
+            elif v == "Y":
+                ss.add_support_roll(node_id=i + 1, direction=1)
+        
+        # Forças
+        for i, (Fx, Fy) in enumerate(forcas):       
+            if Fx != 0 or Fy != 0:
+                ss.point_load(node_id=i + 1, Fx=Fx, Fy=Fy)
+        
+        ss.solve()
+        
+        return ss

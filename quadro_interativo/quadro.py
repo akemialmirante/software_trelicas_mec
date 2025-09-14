@@ -1,16 +1,14 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
+
 import numpy as np
 import tempfile
 import os
-import importlib
 
-web = importlib.import_module("web")
-mostrar_graficos = web.mostrar_graficos
+from mec import processar_trelica
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-from mec import processar_trelica
 
 def extrair_quadro(canvas_result):
     """Nós & Conexões vindos do quadro"""
@@ -62,7 +60,6 @@ def extrair_quadro(canvas_result):
     return nos, conexoes, forcas, suportes
 
 
-
 def find_node_connections(nodes, connections, tolerance=20):
     """criar a matriz de conexão baseado na existência de 2 nós mais próximos à conexão."""
 
@@ -95,7 +92,6 @@ def find_node_connections(nodes, connections, tolerance=20):
     return connectivity_matrix
 
 
-
 def canvas_to_file_format(nos, conexoes, forces_input=None, supports_input=None):
     """tradutor     dados.quadro -> dados.arquivo   para o ler_arquivo()"""
     
@@ -107,7 +103,6 @@ def canvas_to_file_format(nos, conexoes, forces_input=None, supports_input=None)
     
     # Calcular nº conexões
     m = sum(sum(row[i+1:]) for i, row in enumerate(connectivity_matrix))
-    
     
     
     file_lines = [] # linhas do texto
@@ -141,7 +136,6 @@ def canvas_to_file_format(nos, conexoes, forces_input=None, supports_input=None)
             file_lines.append("L")  # default: livre
     
     return "\n".join(file_lines)
-
 
 
 def processar_trelica_quadro(canvas_result, forces_data=None, supports_data=None):
@@ -271,14 +265,8 @@ def quadro_interativo():
                     )
                     
                     if processed_truss:
-                        #st.success("Estutura processada!")
-                        
-                        # armazena informações sobre a treliça
                         st.session_state.processed_truss = processed_truss
-                        
-                        from web import mostrar_graficos
-                        mostrar_graficos(processed_truss)
-                        
+                        return processed_truss
                     else:
                         st.error("Análise falhou! Desenhe melhor da próxima vez... 😏")
             
